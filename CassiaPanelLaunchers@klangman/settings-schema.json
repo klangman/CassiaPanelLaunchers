@@ -1,0 +1,82 @@
+{
+    "section1": {
+        "type": "section",
+        "description": "Behavior"
+    },
+    "launcherList": {
+        "type": "generic",
+        "default": ["firefox.desktop", "org.gnome.Terminal.desktop", "nemo.desktop"]
+    },
+    "allow-dragging": {
+        "type": "switch",
+        "default": true,
+        "description": "Allow dragging of launchers"
+    },
+    "display-number": {
+        "type": "combobox",
+        "default": 2,
+        "options": {
+            "Never": 0,
+            "Always": 1,
+            "2 or more windows": 2
+       },
+    "description": "Display number of application windows"
+    },
+    "middle-click": {
+        "type": "combobox",
+        "default": 0,
+        "options": {
+            "Thumbnail menu toggle": 0,
+            "Thumbnail menu hold": 1,
+            "Close window": 2,
+            "Minimize/Restore": 3,
+            "Maximize/Restore": 4,
+            "Open new window": 5,
+            "Move to workspace 1": 6,
+            "Move to workspace 2": 7,
+            "Move to workspace 3": 8,
+            "Move to workspace 4": 9,
+            "Visible on this/all workspaces": 10,
+            "Do nothing": 99
+        },
+    "description": "Middle button action"
+    },
+    "back-click": {
+        "type": "combobox",
+        "default": 3,
+        "options": {
+            "Thumbnail menu toggle": 0,
+            "Thumbnail menu hold": 1,
+            "Close window": 2,
+            "Minimize/Restore": 3,
+            "Maximize/Restore": 4,
+            "Open new window": 5,
+            "Move to workspace 1": 6,
+            "Move to workspace 2": 7,
+            "Move to workspace 3": 8,
+            "Move to workspace 4": 9,
+            "Visible on this/all workspaces": 10,
+            "Do nothing": 99
+        },
+    "description": "Back button action"
+    },
+    "forward-click": {
+        "type": "combobox",
+        "default": 4,
+        "options": {
+            "Thumbnail menu toggle": 0,
+            "Thumbnail menu hold": 1,
+            "Close window": 2,
+            "Minimize/Restore": 3,
+            "Maximize/Restore": 4,
+            "Open new window": 5,
+            "Move to workspace 1": 6,
+            "Move to workspace 2": 7,
+            "Move to workspace 3": 8,
+            "Move to workspace 4": 9,
+            "Visible on this/all workspaces": 10,
+            "Do nothing": 99
+        },
+    "description": "Forward button action"
+    }
+}
