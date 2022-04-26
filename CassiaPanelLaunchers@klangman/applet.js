@@ -4,7 +4,10 @@
  * Copyright (C) 2013 Lars Mueller <cobinja@yahoo.de>
  *
  * CassiaWindowList is a fork of Cinnamon Panel Launchers which is found here:
- *            https://cinnamon-spices.linuxmint.com/applets/view/287
+ * https://github.com/linuxmint/cinnamon/tree/master/files/usr/share/cinnamon/applets/panel-launchers%40cinnamon.org
+ *
+ * Also borrows code originating from CobiWindowList for the ThumbnailMenu
+ * https://cinnamon-spices.linuxmint.com/applets/view/287
  *
  * CassiaWindowList is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -43,6 +46,7 @@ const PANEL_EDIT_MODE_KEY = 'panel-edit-mode';
 const PANEL_LAUNCHERS_KEY = 'panel-launchers';
 
 const CUSTOM_LAUNCHERS_PATH = GLib.get_home_dir() + '/.cinnamon/panel-launchers';
+const EDITED_LAUNCHERS_PATH = GLib.get_home_dir() + '/.local/share/applications/';
 
 // Standard icons list borrowed from the cinnamon grouped-window-list
 const ICON_NAMES = {
@@ -124,6 +128,478 @@ function hasFocus(metaWindow) {
     return transientHasFocus;
 }
 
+// Represents an item in the Thumbnail popup menu
+class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
+
+  constructor(menu, launcherButton, metaWindow) {
+    super();
+    this._menu = menu;
+    this._launcherButton = appButton;
+    this._metaWindow = metaWindow;
+    this._signalManager = new SignalManager.SignalManager(null);
+    this._settings = this._menu._settings;
+
+    this._box = new St.BoxLayout({vertical: true, reactive: true, style: 'border-width:2px;padding:' + 3 * global.ui_scale + 'px;', style_class: 'item-box'});
+    this.actor.set_style("padding: 0.5em;");
+    this.addActor(this._box);
+
+    this._iconSize = 20 * global.ui_scale;
+    this.descSize = 24 * global.ui_scale;
+    this._icon = this._launcherButton._app ?
+                  this._launcherButton._app.create_icon_texture_for_window(this._iconSize, this._metaWindow) :
+                  new St.Icon({ icon_name: "application-default-icon",
+                                icon_type: St.IconType.FULLCOLOR,
+                                icon_size: this._iconSize });
+    this._icon.natural_width = this._iconSize;
+    this._icon.natural_height = this._iconSize;
+    this._icon.set_width(-1);
+    this._icon.set_height(-1);
+    let monitor = this._launcherButton._applet.panel.monitor;
+    let width = monitor.width;
+    let height = monitor.height;
+    let aspectRatio = width / height;
+    height = Math.round(height / 10) * global.ui_scale;
+    width = Math.round(height * aspectRatio);
+
+    this._descBox = new St.BoxLayout({natural_width: width});
+    this._box.add_actor(this._descBox);
+
+    this._iconBin = new St.Bin({min_width: 0, min_height: 0, natural_width: this.descSize, natural_height: this.descSize});
+    this._descBox.add_actor(this._iconBin);
+    this._iconBin.set_child(this._icon);
+
+    this._label = new St.Label();
+    let text = this._metaWindow.get_title();
+    if (!text) {
+      text = this._launcherButton._app.get_name();
+    }
+    if (!text) {
+      text = "?";
+    }
+    this._label.set_text(text);
+    this._labelBin = new St.Bin();
+    this._labelBin.set_alignment(St.Align.START, St.Align.MIDDLE);
+    this._descBox.add_actor(this._labelBin);
+    this._labelBin.add_actor(this._label);
+
+    this._spacer = new St.Widget();
+    this._descBox.add(this._spacer, {expand: true});
+
+    this._closeBin = new St.Bin({min_width: 0, min_height: 0, natural_width: this.descSize, natural_height: this.descSize, reactive: true});
+    this._closeIcon = new St.Bin({style_class: "window-close", natural_width: this._iconSize, height: this._iconSize});
+    this._descBox.add_actor(this._closeBin);
+    this._closeBin.set_child(this._closeIcon);
+    this._closeIcon.hide();
+
+    if (this._launcherButton._windows.length > 1 && this._launcherButton._currentWindow === metaWindow) {
+      this._box.add_style_pseudo_class('outlined');
+    }
+
+    if (!Main.software_rendering && this._settings.getValue("show-previews")) {
+      this._cloneBin = new St.Bin({min_width: 0, min_height: 0});
+      this._box.add_actor(this._cloneBin);
+      this._cloneBox = new St.Widget();
+      this._cloneBin.add_actor(this._cloneBox);
+    }
+    this._signalManager.connect(this.actor, "enter-event", this._onEnterEvent, this);
+    this._signalManager.connect(this.actor, "leave-event", this._onLeaveEvent, this);
+    this._signalManager.connect(this, "activate", this._onActivate, this);
+  }
+
+  handleDragOver(source, actor, x, y, time) {
+    this.actor.hover = true;
+    Main.activateWindow(this._metaWindow);
+    return DND.DragMotionResult.COPY_DROP;
+  }
+
+  doSize(availWidth, availHeight) {
+    if (Main.software_rendering || !this._settings.getValue("show-previews")) {
+      return;
+    }
+    let monitor = this._launcherButton._applet.panel.monitor;
+    let width = monitor.width;
+    let height = monitor.height;
+    let aspectRatio = width / height;
+
+    let [overheadWidth, overheadHeight] = getOverheadSize(this.actor);
+    overheadHeight += this.descSize;
+
+    this._cloneBox.remove_all_children();
+
+    if (this._menu.box.get_vertical()) {
+      height = (availHeight - overheadHeight);
+      width = Math.floor(height * aspectRatio);
+      this._cloneBin.height = height;
+      this._cloneBin.width = width;
+    } else {
+      width = (availWidth - overheadWidth);
+      height = Math.floor(width / aspectRatio);
+      this._cloneBin.height = height;
+      this._cloneBin.width = width;
+    }
+
+    this._descBox.natural_width = width;
+
+    let clones = WindowUtils.createWindowClone(this._metaWindow, width, height, true, true);
+    for (let i = 0; i < clones.length; i++) {
+      let clone = clones[i];
+      this._cloneBox.add_actor(clone.actor);
+      clone.actor.set_position(clone.x, clone.y);
+    }
+  }
+
+  _onEnterEvent() {
+    if (this._closeIcon instanceof St.Bin) {
+      // fetch the css icon here, so we don't mess with "not in the stage" in the constructor"
+      let icon = St.TextureCache.get_default().load_file_simple(this._closeIcon.get_theme_node().get_background_image());
+      icon.natural_width = this._iconSize;
+      icon.natural_height = this._iconSize;
+      icon.set_opacity(128);
+      this._closeBin.set_child(null);
+      this._closeIcon = icon;
+      this._closeIcon.set_reactive(true);
+      this._closeBin.set_child(this._closeIcon);
+      this._signalManager.connect(this._closeIcon, "button-release-event", this._onClose, this);
+      this._signalManager.connect(this._closeBin, "enter-event", this._onCloseIconEnterEvent, this);
+      this._signalManager.connect(this._closeBin, "leave-event", this._onCloseIconLeaveEvent, this);
+    }
+    this._closeIcon.show();
+  }
+
+  _onLeaveEvent() {
+    this._closeIcon.hide();
+  }
+
+  _onCloseIconEnterEvent() {
+    this._closeIcon.set_opacity(255);
+  }
+
+  _onCloseIconLeaveEvent() {
+    this._closeIcon.set_opacity(128);
+  }
+
+  _onButtonReleaseEvent (actor, event) {
+    let mouseBtn = event.get_button();
+    if (this._appButton._workspace.holdPopup == mouseBtn) {
+       this._appButton._workspace.holdPopup = undefined;
+       this._appButton.closeThumbnailMenu()
+       Main.activateWindow(this._metaWindow);
+       return true;
+    }
+    if (mouseBtn == 2) {  // Middle button
+      let action = this._settings.getValue("preview-middle-click");
+      this._appButton._performMouseAction(action, this._metaWindow);
+      return true;
+    } else if (mouseBtn == 3) { // Right button
+      this._appButton._populateContextMenu(this._metaWindow);
+      this._appButton._contextMenu.open();
+      this._appButton._updateFocus();
+      return true;
+    } else if(mouseBtn == 8) {
+      let action = this._settings.getValue("preview-back-click");
+      this._appButton._performMouseAction(action, this._metaWindow);
+      return true;
+    } else if(mouseBtn == 9) {
+      let action = this._settings.getValue("preview-forward-click");
+      this._appButton._performMouseAction(action, this._metaWindow);
+      return true;
+    }
+    super._onButtonReleaseEvent(actor, event);
+    return true;
+  }
+
+  _onClose() {
+    this._inClosing = true;
+    this._metaWindow.delete(global.get_current_time());
+    this._inClosing = false;
+    return true;
+  }
+
+  _onActivate() {
+    if (!this._inClosing) {
+      this._appButton.closeThumbnailMenu()
+      Main.activateWindow(this._metaWindow);
+    }
+  }
+
+  hide() {
+    this._menu._inHiding = true;
+    this._closeBin.hide();
+
+    if (this._cloneBin) {
+      let animTime = this._settings.getValue("label-animation-time") * 0.001;
+      Tweener.addTween(this.actor, {
+        width: 0,
+        time: animTime,
+        transition: "easeInOutQuad",
+        onUpdate: Lang.bind(this, function() {
+          this.actor.set_clip(this.actor.x, this.actor.y, this.actor.width, this.actor.height);
+        }),
+        onComplete: Lang.bind(this, function () {
+          this.actor.hide();
+          this.actor.set_width(-1);
+          this._menu._inHiding = false;
+          this.destroy();
+        })
+      });
+    } else {
+      this.actor.hide();
+      this._menu._inHiding = false;
+      this.destroy();
+    }
+  }
+
+  updateUrgentState() {
+    if (this._metaWindow.urgent || this._metaWindow.demands_attention) {
+      this.actor.add_style_class_name(STYLE_CLASS_ATTENTION_STATE);
+    } else {
+      this.actor.remove_style_class_name(STYLE_CLASS_ATTENTION_STATE);
+    }
+  }
+
+  destroy() {
+    this._signalManager.disconnectAllSignals();
+    super.destroy();
+  }
+}
+
+// The Thumbnail popup menu
+class ThumbnailMenu extends PopupMenu.PopupMenu {
+
+  constructor(appButton) {
+    super(appButton.actor, appButton._applet.orientation);
+    this._appButton = appButton;
+    this._settings = this._appButton._settings;
+    this._signalManager = new SignalManager.SignalManager(null);
+    this.numThumbs = undefined;
+    this.setCustomStyleClass("grouped-window-list-thumbnail-menu");
+
+    global.focus_manager.add_group(this.actor);
+    this.actor.reactive = true;
+    Main.layoutManager.addChrome(this.actor);
+    this.actor.hide();
+
+    this._updateOrientation();
+
+    this._signalManager.connect(this.actor, "enter-event", this._onEnterEvent, this);
+    this._signalManager.connect(this.actor, "leave-event", this._onLeaveEvent, this);
+    this._signalManager.connect(this.actor, "scroll-event", this._onScrollEvent, this);
+  }
+
+  _updateOrientation() {
+    if (!Main.software_rendering) {
+      this.box.set_vertical(false);
+    }
+
+    if (this._appButton._applet.orientation == St.Side.LEFT ||
+        this._appButton._applet.orientation == St.Side.RIGHT ||
+        !this._settings.getValue("show-previews")) {
+      this.box.set_vertical(true);
+    }
+  }
+
+  _onEnterEvent() {
+    this._appButton.removeThumbnailMenuDelay();
+    return false;
+  }
+
+  _onLeaveEvent() {
+    this._appButton.closeThumbnailMenuDelayed();
+    return false;
+  }
+
+  _onScrollEvent(actor, event) {
+     this._appButton._onScrollEvent(actor, event);
+  }
+
+  _findMenuItemForWindow(metaWindow) {
+    let items = this._getMenuItems();
+    items = items.filter(function(item) {
+      return item._metaWindow == metaWindow;
+    });
+    if (items.length > 0) {
+      return items[0];
+    }
+    return null;
+  }
+
+  openMenu() {
+    if (this.isOpen || this._appButton._windows.length==0 || global.settings.get_boolean("panel-edit-mode") === true) {
+      return;
+    }
+    this._updateOrientation();
+    let groupingType = this._settings.getValue("group-windows");
+    let btns = this._appButton._workspace._lookupAllAppButtonsForApp(this._appButton._app);
+    let windows = [];
+    if (this._appButton._windows.length>1 || btns.length == 1 || (groupingType != GroupType.Pooled && groupingType != GroupType.Auto)){
+      windows = this._appButton._windows;
+    } else {
+       for( let i=0 ; i< btns.length ; i++ ) {
+          windows.push(btns[i]._windows[0]);
+       }
+    }
+    for (let i = 0; i < windows.length; i++) {
+      let window = windows[i];
+      this.addWindow(window);
+    }
+    let wheelSetting = this._settings.getValue("wheel-adjusts-preview-size");
+    if (wheelSetting===ScrollWheelAction.OnGlobal)
+       this.numThumbs = this._appButton._workspace.thumbnailSize;
+    this.updateUrgentState();
+    this.recalcItemSizes();
+
+    super.open(false);
+  }
+
+  closeMenu() {
+    this._appButton._workspace.holdPopup = undefined;
+    if (this._inHiding && this.numMenuItems > 1) {
+      return;
+    }
+    //log( "menu close called!" );
+    //var err = new Error();
+    //log( "Stack:\n"+err.stack );
+    super.close(false);
+    this.removeAll();
+    if (this._settings.getValue("wheel-adjusts-preview-size")<ScrollWheelAction.OnGlobal) // Off or On
+       this.numThumbs = this._settings.getValue("number-of-unshrunk-previews"); // reset the preview window size in case scroll-wheel zooming occurred.
+  }
+
+  addWindow(window) {
+    if (this._findMenuItemForWindow(window) == null) {
+      let appBtn = this._appButton
+      if (appBtn._windows.length == 1 && appBtn._windows[0] != window) {
+         appBtn = this._appButton._workspace._lookupAppButtonForWindow(window);
+      }
+      let menuItem = new ThumbnailMenuItem(this, appBtn, window);
+      this.addMenuItem(menuItem);
+      this.recalcItemSizes();
+    }
+  }
+
+  removeWindow(metaWindow) {
+    let item = this._findMenuItemForWindow(metaWindow);
+    if (item && this.numMenuItems > 1) {
+      item.hide();
+    }
+  }
+
+  recalcItemSizes() {
+    let [overheadWidthActor, overheadHeightActor] = getOverheadSize(this.actor);
+    let [overheadWidth, overheadHeight] = getOverheadSize(this.box);
+    overheadWidth += overheadWidthActor;
+    overheadHeight += overheadHeightActor;
+
+    let monitor = this._appButton._applet.panel.monitor;
+    let panels = Main.panelManager.getPanelsInMonitor(this._appButton._applet.panel.monitorIndex);
+    for (let i = 0; i < panels.length; i++) {
+      if (panels[i].panelPosition == Panel.PanelLoc.top || panels[i].panelPosition == Panel.PanelLoc.bottom) {
+        overheadHeight += panels[i].actor.height;
+      } else {
+        overheadWidth += panels[i].actor.width;
+      }
+    }
+
+    let availWidth = monitor.width - overheadWidth;
+    let availHeight = monitor.height - overheadHeight;
+
+    let spacing = Math.round(this.box.get_theme_node().get_length("spacing"));
+
+    let items = this._getMenuItems();
+    let numItems = items.length;
+
+    let itemWidth = availWidth;
+    let itemHeight = availHeight;
+
+    let numThumbs;
+    if (this.numThumbs === undefined) {
+       numThumbs = this._settings.getValue("number-of-unshrunk-previews");
+       this.numThumbs = numThumbs;
+    } else {
+       numThumbs = this.numThumbs;
+    }
+
+    if (this.box.get_vertical()) {
+      itemHeight = (availHeight / (Math.max(numItems, numThumbs))) - ((numItems - 1) * spacing * global.ui_scale);
+    } else {
+      itemWidth = (availWidth / (Math.max(numItems, numThumbs))) - ((numItems - 1) * spacing * global.ui_scale);
+    }
+
+    for (let i = 0; i < numItems; i++) {
+      items[i].doSize(itemWidth, itemHeight);
+    }
+  }
+
+  destroy() {
+    this._signalManager.disconnectAllSignals();
+    super.destroy();
+  }
+
+  updateUrgentState() {
+    let items = this._getMenuItems();
+    items.forEach(menuItem => {
+      menuItem.updateUrgentState();
+    });
+  }
+}
+
+class ThumbnailMenuManager extends PopupMenu.PopupMenuManager {
+
+  constructor(owner) {
+    super(owner);
+    this.dragMotion = this.dragMotionHandler.bind(this);
+    this._signals.connect(Main.xdndHandler, "drag-end", this.onDragEnd, this);
+    this._signals.connect(Main.xdndHandler, "drag-begin", this.onDragBegin, this);
+    this._workspace = owner;
+  }
+
+  onDragBegin() {
+    DND.addDragMonitor(this);
+  }
+
+  onDragEnd() {
+    DND.removeDragMonitor(this);
+    this._workspace.closeThumbnailMenu();
+  }
+
+  dragMotionHandler(dragEvent) {
+    if (dragEvent) {
+      if (dragEvent.source instanceof WindowListButton || dragEvent.source.isDraggableApp || dragEvent.source instanceof DND.LauncherDraggable) {
+        return DND.DragMotionResult.CONTINUE;
+      }
+      let hoverMenu = this._findMenuForActor(dragEvent);
+      if (hoverMenu) {
+        if (hoverMenu !== this._activeMenu) {
+          if (hoverMenu._appButton._windows.length > 1) {
+            this._changeMenu(hoverMenu);
+          } else if (hoverMenu._appButton._windows.length === 1) {
+            this._workspace.closeThumbnailMenu();
+            Main.activateWindow(hoverMenu._appButton._currentWindow);
+          }
+        }
+      } else {
+        this._workspace.closeThumbnailMenu();
+      }
+    }
+    return DND.DragMotionResult.CONTINUE;
+  }
+
+  _findMenuForActor(dragEvent) {
+    let actor = global.stage.get_actor_at_pos(Clutter.PickMode.ALL, dragEvent.x, dragEvent.y);
+    if (actor.is_finalized()) {
+      return null;
+    }
+    for (let i = 0; i < this._menus.length; i++) {
+      let menu = this._menus[i];
+      if (menu.actor.contains(actor) || menu.sourceActor.contains(actor)) {
+        return menu;
+      }
+    }
+    return null;
+  }
+}
+
+/* The launcherButton context menu */
 class PanelAppLauncherMenu extends Applet.AppletPopupMenu {
     constructor(launcher, orientation) {
         let item;
@@ -226,6 +702,7 @@ class PanelAppLauncherMenu extends Applet.AppletPopupMenu {
     }
 }
 
+/* The launcherButton class */
 class PanelAppLauncher extends DND.LauncherDraggable {
     constructor(launchersBox, app, appinfo, orientation, icon_size) {
         super(launchersBox);
@@ -1045,8 +1522,11 @@ class CinnamonPanelLaunchersApplet extends Applet.Applet {
 
     showAddLauncherDialog(timestamp, launcher){
         if (launcher) {
-           log( "editing cmd: cinnamon-desktop-editor -mcinnamon-launcher -f" + launcher.getId() + " " + this.settings.file.get_path() );
-            Util.spawnCommandLine("cinnamon-desktop-editor -mcinnamon-launcher -f" + launcher.getId() + " " + this.settings.file.get_path());
+           // Create a new desktop file in ~/.local/share/applications/
+           let desktopFullPath = launcher.app.get_app_info().get_filename();
+           let id = launcher.getId();
+           let desktopPath = desktopFullPath.slice(0, desktopFullPath.length-id.length);  // full path with the file name removed.
+           Util.spawnCommandLine( "cinnamon-desktop-editor -m launcher -f " + launcher.getId() + " -o " + desktopPath + " -d " + EDITED_LAUNCHERS_PATH);
         } else {
             Util.spawnCommandLine("cinnamon-desktop-editor -mcinnamon-launcher " + this.settings.file.get_path());
         }
