@@ -837,7 +837,7 @@ class PanelAppLauncher extends DND.LauncherDraggable {
     _updateTooltip(){
        let showTooltips = this.settings.getValue("show-tooltips");
        let showMenuOnHover = this.settings.getValue("menu-show-on-hover");
-       if (showTooltips && (!showMenuOnHover || this._windows.length ===0)){
+       if (showTooltips && (!showMenuOnHover || this._windows.length === 0)){
           this._tooltip.preventShow = false
        } else {
           this._tooltip.preventShow = true
