@@ -1,21 +1,21 @@
 /*
  * applet.js
  * Copyright (C) 2022 Kevin Langman <klangman@gmail.com>
- * Copyright (C) 2013 Lars Mueller <cobinja@yahoo.de>
  *
- * CassiaWindowList is a fork of Cinnamon Panel Launchers which is found here:
+ * CassiaPanelLaunchers is a fork of Cinnamon Panel Launchers which is found here:
  * https://github.com/linuxmint/cinnamon/tree/master/files/usr/share/cinnamon/applets/panel-launchers%40cinnamon.org
  *
  * Also borrows code originating from CobiWindowList for the ThumbnailMenu
+ * Copyright (C) 2013 Lars Mueller <cobinja@yahoo.de>
  * https://cinnamon-spices.linuxmint.com/applets/view/287
  *
- * CassiaWindowList is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
+ * CassiaPanelLaunchers is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by the
  * Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * CassiaWindowList is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * CassiaPanelLaunchers is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
  *
@@ -32,6 +32,7 @@ const CMenu = imports.gi.CMenu;
 const Lang = imports.lang;
 const Gio = imports.gi.Gio;
 const PopupMenu = imports.ui.popupMenu;
+const Meta = imports.gi.Meta;
 const Main = imports.ui.main;
 const Mainloop = imports.mainloop;
 const Panel = imports.ui.panel;
@@ -114,6 +115,22 @@ const DisplayNumber = {
   No: 0,            // The number of windows attached to a window list button is never displayed
   All: 1,           // ... always displayed
   Smart: 2          // ... only displayed when 2 of more windows exist
+}
+
+// Possible value for the Mouse Action setting
+const MouseAction = {
+  Preview: 0,         // Toggle the preview menu (open/close)
+  PreviewHold: 1,     // Show the window preview menu on button press and hide it again on button release
+  Close: 2,           // Close the window
+  Minimize: 3,        // Minimize/restore toggle for the window
+  Maximize: 4,        // Maximize/restore toggle for the window
+  New: 5,             // Open a new window for this application
+  MoveWorkspace1: 6,  // Move window to WorkSPace #1
+  MoveWorkspace2: 7,  // 2
+  MoveWorkspace3: 8,  // 3
+  MoveWorkspace4: 9,  // 4
+  WS_Visibility: 10,  // Toggle workspace visibility from all to only this workspace
+  None: 99,           // No action performed
 }
 
 const ScrollWheelAction = {
@@ -837,7 +854,7 @@ class PanelAppLauncher extends DND.LauncherDraggable {
     _updateTooltip(){
        let showTooltips = this.settings.getValue("show-tooltips");
        let showMenuOnHover = this.settings.getValue("menu-show-on-hover");
-       if (showTooltips && (!showMenuOnHover || this._windows.length ===0)){
+       if (showTooltips && (!showMenuOnHover || this._windows.length === 0)){
           this._tooltip.preventShow = false
        } else {
           this._tooltip.preventShow = true
@@ -1107,16 +1124,17 @@ class PanelAppLauncher extends DND.LauncherDraggable {
                       this.closeThumbnailMenu();
                       this.launch();
                    } else {
-                      if (this._windows.length > 1){
-                         if (this.menu.isOpen === false) {
+                      let thumbnailOnClick = this.settings.getValue("menu-show-on-click");
+                      if (this._windows.length > 1 && thumbnailOnClick ){
+                         if (thumbnailOnClick && this.menu.isOpen === false) {
                             this.openThumbnailMenu();
-                         } else {
+                         } else if (this.menu.isOpen === true) {
                             this.closeThumbnailMenu();
                          }
-                      }else
-                      if (hasFocus(this._currentWindow)) {
+                      } else if (hasFocus(this._currentWindow)) {
                          for( let idx=0 ; idx < this._windows.length ; idx++ ) {
                             if (this._windows[idx] === this._currentWindow) {
+                               this.closeThumbnailMenu();
                                if (idx === this._windows.length-1) {
                                   Main.activateWindow(this._windows[0]);
                                } else {
@@ -1126,20 +1144,109 @@ class PanelAppLauncher extends DND.LauncherDraggable {
                             }
                          }
                       } else {
+                         this.closeThumbnailMenu();
                          Main.activateWindow(this._currentWindow);
                       }
                    }
                 }
             } else if (button==2) { // Middle Button
-                this.launch();
+               let action = this.settings.getValue("middle-click");
+                this._performMouseAction(action, this._currentWindow);
+            } else if (button==8) { // Back Button
+               let action = this.settings.getValue("back-click");
+                this._performMouseAction(action, this._currentWindow);
+            } else if (button==9) { // Forward Button
+               let action = this.settings.getValue("forward-click");
+                this._performMouseAction(action, this._currentWindow);
             }
+        }
+    }
+
+    // Perform the action defined by the passed in action integer
+    _performMouseAction(action, window) {
+        switch (action) {
+           case MouseAction.Preview:
+              let curMenu = this._applet.currentMenu;
+              if (curMenu) {
+                 this.closeThumbnailMenu();
+              } else {
+                 this.openThumbnailMenu();
+              }
+              break;
+           case MouseAction.PreviewHold:
+              this.closeThumbnailMenu();
+              break;
+           case MouseAction.Close:
+              if (window)
+                 window.delete(global.get_current_time());
+              break;
+           case MouseAction.Minimize:
+              if (window) {
+                 if (window.minimized===false) {
+                    window.minimize();
+                 } else {
+                   this.closeThumbnailMenu();
+                   Main.activateWindow(window); 
+                 }
+              }
+              break;
+           case MouseAction.Maximize:
+              if (window) {
+                 if (window.get_maximized()) {
+                    window.unmaximize(Meta.MaximizeFlags.VERTICAL | Meta.MaximizeFlags.HORIZONTAL)
+                 } else {
+                    window.maximize(Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL);
+                 }
+              }
+              break;
+           case MouseAction.New:
+              this.launch();
+              break;
+           case MouseAction.MoveWorkspace1:
+              if (window) {
+                 if (this.menu != undefined) this.menu.removeWindow(window);
+                 window.change_workspace_by_index(0, false, 0);
+              }
+              break;
+           case MouseAction.MoveWorkspace2:
+              {
+                 let nWorkspaces = global.screen.get_n_workspaces();
+                 if (window && nWorkspaces <= 2) {
+                    if (this.menu != undefined) this.menu.removeWindow(window);
+                       window.change_workspace_by_index(1, false, 1);
+                 }
+              }
+              break;
+           case MouseAction.MoveWorkspace3:
+              {
+                 let nWorkspaces = global.screen.get_n_workspaces();
+                 if (window && nWorkspaces <= 3)
+                    if (this.menu != undefined) this.menu.removeWindow(window);
+                    window.change_workspace_by_index(2, false, 0);
+              }
+              break;
+           case MouseAction.MoveWorkspace4:
+              {
+                 let nWorkspaces = global.screen.get_n_workspaces();
+                 if (window && nWorkspaces <= 4)
+                    if (this.menu != undefined) this.menu.removeWindow(window);
+                    window.change_workspace_by_index(3, false, 0);
+              }
+              break;
+           case MouseAction.WS_Visibility:
+              if (window.is_on_all_workspaces()) {
+                 window.unstick();
+              } else {
+                 window.stick();
+              }
+              break;
         }
     }
 
     _updateIconSize() {
         //log( `CPL IconSize: pannelHeigth: ${this.launchersBox._panelHeight}  iconSize: ${this.icon.get_icon_size()}` );
-        if (this.icon.get_icon_size() > this.launchersBox._panelHeight - 4)
-           this.icon.set_icon_size(this.launchersBox._panelHeight - 4);
+        if (this.icon.get_icon_size() > this.launchersBox._panelHeight - 2)
+           this.icon.set_icon_size(this.launchersBox._panelHeight - 2);
     }
 
    _updateOrientation() {
@@ -1153,19 +1260,19 @@ class PanelAppLauncher extends DND.LauncherDraggable {
       switch (this.orientation) {
          case St.Side.LEFT:
             this.actor.add_style_class_name("left");
-            this.actor.set_style("margin-left: 1px; margin-right: 1px; padding: 1px; margin-bottom: 4px;");
+            this.actor.set_style("margin-left: 1px; margin-right: 1px; padding: 0px; margin-bottom: 4px;");
             break;
          case St.Side.RIGHT:
             this.actor.add_style_class_name("right");
-            this.actor.set_style("margin-left: 1px; margin-right: 1px; padding: 1px; margin-bottom: 4px;");
+            this.actor.set_style("margin-left: 1px; margin-right: 1px; padding: 0px; margin-bottom: 4px;");
             break;
          case St.Side.TOP:
             this.actor.add_style_class_name("top");
-            this.actor.set_style("margin-top: 1px; margin-bottom: 1px; padding: 1px; margin-left: 4px;");
+            this.actor.set_style("margin-top: 1px; margin-bottom: 1px; padding: 0px; margin-left: 4px;");
             break;
          case St.Side.BOTTOM:
             this.actor.add_style_class_name("bottom");
-            this.actor.set_style("margin-top: 1px; margin-bottom: 1px; padding: 1px; margin-left: 4px;");
+            this.actor.set_style("margin-top: 1px; margin-bottom: 1px; padding: 0px; margin-left: 4px;");
             break;
       }
    }
@@ -1419,6 +1526,7 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
         this.on_orientation_changed(orientation);
 
         this.currentMenu = undefined; // The currently open Thumbnail menu
+        this.currentFocus = null;
     }
 
     lookupLauncherForApp(app) {
@@ -1449,14 +1557,43 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
         this._signalManager.connect(Main.layoutManager, "monitors-changed", this._updateMonitor, this);
         this._signalManager.connect(this.settings, "changed::display-number", this._updateCurrentWorkspace, this);
         this._updateCurrentWorkspace();
+        this._registerExistingWindows();
+        this.updateCassiaWindowList();
+    }
+
+    updateCassiaWindowList(){
+        let applets = AppletManager.getRunningInstancesForUuid("CassiaWindowList@klangman");
+        log( `Found ${applets.length} cassia window list applets!` );
+        for (let i=0 ; i < applets.length ; i++) {
+           applets[i].cassiaPanelLaunchersUpdate();
+        }
+    }
+
+    on_applet_removed_from_panel() {
+       this._signalManager.disconnectAllSignals();
+    }
+
+    _registerExistingWindows(){
+       let nWorkspaces = global.screen.get_n_workspaces();
+       for (let wsIdx=0 ; wsIdx < nWorkspaces ; wsIdx++) {
+          let ws = global.screen.get_workspace_by_index(wsIdx);
+          let wsWindows = ws.list_windows();
+          for ( let idx=0 ; idx < wsWindows.length ; idx++ ) {
+             this._signalManager.connect(wsWindows[idx], "workspace-changed", this._onWindowWorkspaceChanged, this);
+          }
+       }
     }
 
     _updateFocus(){
         let window = global.display.get_focus_window();
         if (window) {
            let launcher = this.lookupLauncherForWindow(window);
+           if (this.currentFocus && this.currentFocus != launcher)
+              this.currentFocus.actor.remove_style_pseudo_class("focus");
+           this.currentFocus = launcher;
            if (launcher) {
               launcher._currentWindow = window;
+              launcher.actor.add_style_pseudo_class("focus");
            }
         }
     }
@@ -1468,6 +1605,7 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
        for ( let idx=0 ; idx < this._launchers.length ; idx++ ) {
           this._launchers[idx].workspaceChanged(wsWindows);
        }
+       this._updateFocus();
     }
 
     _onWorkspaceAdded(screen, wsNum) {
@@ -1482,27 +1620,40 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
         if (!Main.isInteresting(metaWindow)) {
            return;
         }
-        //log( "_windowAdded for: " + metaWindow );
-        //let currentWs = global.screen.get_active_workspace_index();
         let app = this._windowTracker.get_window_app(metaWindow);
         if (!app) {
            app = this._windowTracker.get_app_from_pid(metaWindow.get_pid());
         }
         let launcher = this.lookupLauncherForApp(app);
-        //if (!launcher) log( "window launcher was not found for window: " + metaWindow );
         if (launcher) {
            launcher.windowAdded(metaWindow);
         }
+        this._signalManager.connect(metaWindow, "workspace-changed", this._onWindowWorkspaceChanged, this);
     }
 
     _windowRemoved(screen, metaWindow, monitor) {
-        //log( "_windowRemoved" );
-        //let currentWs = global.screen.get_active_workspace_index();
+        if (!Main.isInteresting(metaWindow)) {
+           return;
+        }
         let launcher = this.lookupLauncherForWindow(metaWindow);
-        //if (!launcher) log( "window launcher was not found for window: " + metaWindow );
+        this._signalManager.disconnect("workspace-changed", metaWindow);
         if (launcher) {
            launcher.windowRemoved(metaWindow);
         }
+    }
+
+    _onWindowWorkspaceChanged(window, wsNum) {
+       let currentWs = global.screen.get_active_workspace_index();
+       let launcher = this.lookupLauncherForWindow(window);
+       if (launcher) {
+          if (wsNum === currentWs) {
+             // Window removed from workspace
+             launcher.windowRemoved(window);
+          } else {
+             // Window added to workspace
+             launcher.windowAdded(window);
+          }
+       }
     }
 
     _windowMonitorChanged(screen, window, monitor) {
@@ -1535,6 +1686,7 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
         this.launcherList = this._settings_proxy.map(x => x.file);
         this.settings.setValue("launcherList", this.launcherList);
         this.settings.bind("launcherList", "launcherList", this._reload);
+        this.updateCassiaWindowList();
     }
 
     _remove_launcher_from_proxy(visible_index) {
@@ -1629,6 +1781,9 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
     }
 
     _reload() {
+        //var err = new Error();
+        //log( "Stack:\n"+err.stack );
+        //let startTime = Date.now();
         this._launchers.forEach(l => l.destroy());
         this._launchers = [];
         this._settings_proxy = [];
@@ -1645,6 +1800,8 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
             this._settings_proxy.push(proxyObj);
         }
         this._updateCurrentWorkspace();
+        //let endTime = Date.now();
+        //log(`Call to _reload took ${endTime - startTime} milliseconds`)
     }
 
     removeLauncher(launcher, delete_file) {
@@ -1726,6 +1883,15 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
           }
           this._delayId = null;
        }
+    }
+
+    // An API that returns a list of applications that have buttons on this launcher applet
+    getApplicationList(){
+       let result = [];
+       for ( let idx=0 ; idx < this._launchers.length ; idx++ ) {
+          result.push(this._launchers[idx].app);
+       }
+       return(result);
     }
 }
 Signals.addSignalMethods(CassiaPanelLaunchersApplet.prototype);
