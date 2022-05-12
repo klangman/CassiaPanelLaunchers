@@ -761,7 +761,8 @@ class PanelAppLauncher extends DND.LauncherDraggable {
 
         this._signals = new SignalManager.SignalManager(null);
 
-        this.actor = new St.BoxLayout({ style_class: 'grouped-window-list-item-box', //'launcher',
+        this.actor = new St.BoxLayout({
+                                  style_class: 'grouped-window-list-item-box', //'launcher',
                                   //important: true,
                                   reactive: true,
                                   can_focus: true,
@@ -783,8 +784,8 @@ class PanelAppLauncher extends DND.LauncherDraggable {
         //                             important: true });
         this._iconBox = new St.Group();
         this._iconBin = new St.Bin({ name: "appMenuIcon",
-                                     //x_align: St.Align.MIDDLE,
-                                     //y_align: St.Align.MIDDLE
+                                     x_align: St.Align.MIDDLE,
+                                     y_align: St.Align.MIDDLE
                                     });
 
         this.actor.add_actor(this._iconBox);
@@ -792,6 +793,15 @@ class PanelAppLauncher extends DND.LauncherDraggable {
 
         this.icon = this._getIconActor();
         this._iconBin.set_child(this.icon);
+
+        let panelHeight = this._applet._panelHeight;
+        let iconSize = this._applet.getPanelIconSize(St.IconType.FULLCOLOR);
+         if ((panelHeight - iconSize) & 1) {
+           panelHeight--;
+         }
+        this._iconBin.natural_width = panelHeight;
+        this._iconBin.natural_height = panelHeight;
+
         this._iconBox.add_actor(this._iconBin);
 
         // Build up the window count number badge
@@ -985,6 +995,8 @@ class PanelAppLauncher extends DND.LauncherDraggable {
            this._labelNumberBin.width = size;
            this._labelNumberBin.height = size;
         }
+        this._signals.connect(metaWindow, "workspace-changed", this._applet._onWindowWorkspaceChanged, this);
+
     }
 
     windowRemoved(metaWindow) {
@@ -993,6 +1005,7 @@ class PanelAppLauncher extends DND.LauncherDraggable {
         this._curWorkspaceWindowCnt--;
         if (this._curWorkspaceWindowCnt === 0) {
            this.actor.remove_style_pseudo_class("active");
+           this.actor.remove_style_pseudo_class("focus" );
            this._applet.thumbnailMenuManager.removeMenu(this.menu);
            this.menu.destroy();
            this.menu= null;
@@ -1007,6 +1020,7 @@ class PanelAppLauncher extends DND.LauncherDraggable {
         } else {
             this._labelNumberBox.hide();
         }
+        this._signals.disconnect("workspace-changed", metaWindow);
     }
 
     _onDragBegin() {
@@ -1260,19 +1274,19 @@ class PanelAppLauncher extends DND.LauncherDraggable {
       switch (this.orientation) {
          case St.Side.LEFT:
             this.actor.add_style_class_name("left");
-            this.actor.set_style("margin-left: 1px; margin-right: 1px; padding: 0px; margin-bottom: 4px;");
+            this.actor.set_style("margin: 0px; padding: 0px; margin-top: 2px; margin-bottom: 2px;");
             break;
          case St.Side.RIGHT:
             this.actor.add_style_class_name("right");
-            this.actor.set_style("margin-left: 1px; margin-right: 1px; padding: 0px; margin-bottom: 4px;");
+            this.actor.set_style("margin: 0px; padding: 0px; margin-top: 2px; margin-bottom: 2px;");
             break;
          case St.Side.TOP:
             this.actor.add_style_class_name("top");
-            this.actor.set_style("margin-top: 1px; margin-bottom: 1px; padding: 0px; margin-left: 4px;");
+            this.actor.set_style("margin: 0px; padding: 0px; margin-left: 2px; margin-right: 2px;");
             break;
          case St.Side.BOTTOM:
             this.actor.add_style_class_name("bottom");
-            this.actor.set_style("margin-top: 1px; margin-bottom: 1px; padding: 0px; margin-left: 4px;");
+            this.actor.set_style("margin: 0px; padding: 0px; margin-left: 2px; margin-right: 2px;");
             break;
       }
    }
@@ -1331,6 +1345,9 @@ class PanelAppLauncher extends DND.LauncherDraggable {
     }
 
     destroy() {
+        for (let idx=this._windows.length ; idx > 0 ; idx--) {
+           this.windowRemoved(this._windows[idx]);
+        }
         this._signals.disconnectAllSignals();
         this._contextMenu.destroy();
         this._menuManager.destroy();
@@ -1339,6 +1356,12 @@ class PanelAppLauncher extends DND.LauncherDraggable {
            this._applet.thumbnailMenuManager.removeMenu(this.menu);
            this.menu.destroy();
         }
+        this.icon.destroy();
+        this._iconBin.destroy();
+        this._iconBox.destroy();
+        this._labelNumberBin.destroy();
+        this._labelNumberBox.destroy();
+        this._tooltip.destroy();
         this.actor.destroy();
     }
 }
@@ -1483,6 +1506,7 @@ class LaunchersBox {
 
     _destroy() {
         this.actor._delegate = null;
+        this.actor.destroy();
         this.actor = null;
         this.applet = null;
     }
@@ -1496,7 +1520,7 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
         this.setAllowedLayout(Applet.AllowedLayout.BOTH);
 
         this.orientation = null;
-        this.icon_size = this.getPanelIconSize(St.IconType.FULLCOLOR);
+        this.icon_size = this.getPanelIconSize(St.IconType.FULLCOLOR) -2;
 
         // LaunchersBox() handles DND. This would be cleaner as a BoxLayout class but
         // would also add pointless overhead.
