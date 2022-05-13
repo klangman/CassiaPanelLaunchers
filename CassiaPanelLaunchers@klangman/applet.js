@@ -142,9 +142,17 @@ const ScrollWheelAction = {
 
 let pressLauncher = null;
 
-function hasFocus(metaWindow) {
-    if (metaWindow.appears_focused) {
-        return true;
+function hasFocus(metaWindow, allowTransient=true) {
+    let window = global.display.get_focus_window();
+    if (window === metaWindow) {
+       return true;
+    }
+    //if (metaWindow.appears_focused) {
+    //    log( "appears_focused" );
+    //    return true;
+    //}
+    if (allowTransient===false) {
+       return false;
     }
     let transientHasFocus = false;
     metaWindow.foreach_transient(function(transient) {
@@ -908,12 +916,10 @@ class PanelAppLauncher extends DND.LauncherDraggable {
         this.menu.numThumbs = numThumbs;
         this.menu.recalcItemSizes();
         if (wheelSetting===ScrollWheelAction.OnGlobal) {
-           this._workspace.thumbnailSize = numThumbs;
+           this._applet.thumbnailSize = numThumbs;
         } else if (wheelSetting===ScrollWheelAction.OnApplication) {
-           let btns = this._workspace._lookupAllAppButtonsForApp(this._app);
-           for (let idx=0 ; idx < btns.length ; idx++ ) {
-              btns[idx].menu.numThumbs = numThumbs;
-           }
+           let launcher = this._applet.lookupLauncherForApp(this._app);
+           launcher.menu.numThumbs = numThumbs;
         }
     }
 
