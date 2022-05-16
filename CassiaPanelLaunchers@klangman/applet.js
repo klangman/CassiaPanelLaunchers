@@ -497,8 +497,8 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
     }
     let wheelSetting = this._settings.getValue("wheel-adjusts-preview-size");
     // TODO... fix this so it can be re-enabled!
-    //if (wheelSetting===ScrollWheelAction.OnGlobal)
-    //   this.numThumbs = this._launcherButton._applet.thumbnailSize;
+    if (wheelSetting===ScrollWheelAction.OnGlobal)
+       this.numThumbs = this._launcherButton._applet.thumbnailSize;
     this.updateUrgentState();
     this.recalcItemSizes();
 
@@ -828,7 +828,6 @@ class PanelAppLauncher extends DND.LauncherDraggable {
 
         // Window tracking data
         this._windows = [];
-        this._curWorkspaceWindowCnt = 0;
         this._currentWindow = null;
 
         //log( "Calling _updateOrientation from constructor!" );
@@ -937,8 +936,8 @@ class PanelAppLauncher extends DND.LauncherDraggable {
 
     workspaceChanged(wsWindows) {
        this.dspNumber = this.settings.getValue("display-number");
-       this._windows = []
-       this._curWorkspaceWindowCnt = 0;
+       this._windows = [];
+       let windowCnt = 0;
        if (this.menu) {
           this.menu.removeAll();
           this._applet.thumbnailMenuManager.removeMenu(this.menu);
@@ -950,8 +949,8 @@ class PanelAppLauncher extends DND.LauncherDraggable {
              app = this.launchersBox._windowTracker.get_app_from_pid(wsWindows[idx].get_pid());
           }
           if (Main.isInteresting(wsWindows[idx]) && app === this.app) {
-             this._curWorkspaceWindowCnt++;
-             if (this._curWorkspaceWindowCnt === 1){
+             windowCnt++;
+             if (windowCnt === 1){
                 this.menu = new ThumbnailMenu(this);
                 this._applet.thumbnailMenuManager.addMenu(this.menu);
              }
@@ -961,13 +960,13 @@ class PanelAppLauncher extends DND.LauncherDraggable {
        }
        this._currentWindow = this.findMostRecentlyUsedWindow();
        this._updateTooltip();
-       if (this._curWorkspaceWindowCnt > 0) {
+       if (windowCnt > 0) {
            this.actor.add_style_pseudo_class("active");
        } else {
            this.actor.remove_style_pseudo_class("active");
        }
-       if ((this.dspNumber === DisplayNumber.All && this._curWorkspaceWindowCnt >= 1) || (this.dspNumber === DisplayNumber.Smart && this._curWorkspaceWindowCnt >= 2)) {
-           this._labelNumber.set_text(this._curWorkspaceWindowCnt.toString());
+       if ((this.dspNumber === DisplayNumber.All && windowCnt >= 1) || (this.dspNumber === DisplayNumber.Smart && windowCnt >= 2)) {
+           this._labelNumber.set_text(windowCnt.toString());
            this._labelNumberBox.show();
            let [width, height] = this._labelNumber.get_size();
            let size = Math.max(width, height);
@@ -980,8 +979,8 @@ class PanelAppLauncher extends DND.LauncherDraggable {
 
     windowAdded(metaWindow) {
         this._windows.push(metaWindow);
-        this._curWorkspaceWindowCnt++;
-        if (this._curWorkspaceWindowCnt === 1){
+        let windowCnt = this._windows.length;
+        if (windowCnt === 1){
            this.menu = new ThumbnailMenu(this);
            this._applet.thumbnailMenuManager.addMenu(this.menu);
            this._updateTooltip();
@@ -991,10 +990,10 @@ class PanelAppLauncher extends DND.LauncherDraggable {
         }
         this.menu.addWindow(metaWindow);
         this.actor.add_style_pseudo_class("active");
-        if (this.dspNumber === DisplayNumber.All || (this.dspNumber === DisplayNumber.Smart && this._curWorkspaceWindowCnt >= 2)) {
-            this._labelNumber.set_text(this._curWorkspaceWindowCnt.toString());
+        if (this.dspNumber === DisplayNumber.All || (this.dspNumber === DisplayNumber.Smart && windowCnt >= 2)) {
+            this._labelNumber.set_text(windowCnt.toString());
         }
-        if ((this.dspNumber === DisplayNumber.All && this._curWorkspaceWindowCnt === 1) || (this.dspNumber === DisplayNumber.Smart && this._curWorkspaceWindowCnt === 2)) {
+        if ((this.dspNumber === DisplayNumber.All && windowCnt === 1) || (this.dspNumber === DisplayNumber.Smart && windowCnt === 2)) {
            this._labelNumberBox.show();
            let [width, height] = this._labelNumber.get_size();
            let size = Math.max(width, height);
@@ -1007,9 +1006,10 @@ class PanelAppLauncher extends DND.LauncherDraggable {
 
     windowRemoved(metaWindow) {
         let idx = this._windows.indexOf(metaWindow);
+        this._windows.splice(idx, 1);
+        let windowCnt = this._windows.length;
         this.menu.removeWindow(metaWindow);
-        this._curWorkspaceWindowCnt--;
-        if (this._curWorkspaceWindowCnt === 0) {
+        if (windowCnt === 0) {
            this.actor.remove_style_pseudo_class("active");
            this.actor.remove_style_pseudo_class("focus" );
            this._applet.thumbnailMenuManager.removeMenu(this.menu);
@@ -1017,12 +1017,11 @@ class PanelAppLauncher extends DND.LauncherDraggable {
            this.menu= null;
            this._updateTooltip();
         }
-        this._windows.splice(idx, 1);
         if (metaWindow === this._currentWindow) {
            this._currentWindow = this.findMostRecentlyUsedWindow()
         }
-        if ((this.dspNumber === DisplayNumber.All && this._curWorkspaceWindowCnt >= 1) || (this.dspNumber === DisplayNumber.Smart && this._curWorkspaceWindowCnt >= 2)) {
-            this._labelNumber.set_text(this._curWorkspaceWindowCnt.toString());
+        if ((this.dspNumber === DisplayNumber.All && windowCnt >= 1) || (this.dspNumber === DisplayNumber.Smart && windowCnt >= 2)) {
+            this._labelNumber.set_text(windowCnt.toString());
         } else {
             this._labelNumberBox.hide();
         }
@@ -1127,56 +1126,76 @@ class PanelAppLauncher extends DND.LauncherDraggable {
     }
 
     _onButtonPress(actor, event) {
-        pressLauncher = this.getAppname();
-
-        if (event.get_button() == 3)
+        if (this._contextMenu.isOpen) {
             this._contextMenu.toggle();
+        }
+        pressLauncher = this.getAppname();
+        if (pressLauncher == this.getAppname()) {
+           let mouseBtn = event.get_button(); 
+           if (mouseBtn == 2) {
+              let action = this.settings.getValue("middle-click");
+              if (action == MouseAction.PreviewHold) {
+                 this.openThumbnailMenu();
+                 this.holdPopup = 2;
+              }
+           } else if (mouseBtn == 8) {
+              let action = this.settings.getValue("back-click");
+              if (action == MouseAction.PreviewHold) {
+                 this.openThumbnailMenu();
+                 this.holdPopup = 8;
+              }
+           } else if (mouseBtn == 9) {
+              let action = this.settings.getValue("forward-click");
+              if (action == MouseAction.PreviewHold) {
+                 this.openThumbnailMenu();
+                 this.holdPopup = 9;
+              }
+           }
+        }
     }
 
     _onButtonRelease(actor, event) {
         if (pressLauncher == this.getAppname()) {
             let button = event.get_button();
-            if (button==1) {
-                if (this._contextMenu.isOpen) {
-                   this._contextMenu.toggle();
+            if (button==1) { // Left Button
+                if (this._currentWindow === null) {
+                   this.closeThumbnailMenu();
+                   this.launch();
                 } else {
-                   if (this._currentWindow === null) {
-                      this.closeThumbnailMenu();
-                      this.launch();
-                   } else {
-                      let thumbnailOnClick = this.settings.getValue("menu-show-on-click");
-                      if (this._windows.length > 1 && thumbnailOnClick ){
-                         if (thumbnailOnClick && this.menu.isOpen === false) {
-                            this.openThumbnailMenu();
-                         } else if (this.menu.isOpen === true) {
-                            this.closeThumbnailMenu();
-                         }
-                      } else if (hasFocus(this._currentWindow)) {
-                         for( let idx=0 ; idx < this._windows.length ; idx++ ) {
-                            if (this._windows[idx] === this._currentWindow) {
-                               this.closeThumbnailMenu();
-                               if (idx === this._windows.length-1) {
-                                  Main.activateWindow(this._windows[0]);
-                               } else {
-                                  Main.activateWindow(this._windows[idx+1]);
-                               }
-                               break;
-                            }
-                         }
-                      } else {
+                   let thumbnailOnClick = this.settings.getValue("menu-show-on-click");
+                   if (this._windows.length > 1 && thumbnailOnClick ){
+                      if (thumbnailOnClick && this.menu.isOpen === false) {
+                         this.openThumbnailMenu();
+                      } else if (this.menu.isOpen === true) {
                          this.closeThumbnailMenu();
-                         Main.activateWindow(this._currentWindow);
                       }
+                   } else if (hasFocus(this._currentWindow)) {
+                      for( let idx=0 ; idx < this._windows.length ; idx++ ) {
+                         if (this._windows[idx] === this._currentWindow) {
+                            this.closeThumbnailMenu();
+                            if (idx === this._windows.length-1) {
+                               Main.activateWindow(this._windows[0]);
+                            } else {
+                               Main.activateWindow(this._windows[idx+1]);
+                            }
+                            break;
+                         }
+                      }
+                   } else {
+                      this.closeThumbnailMenu();
+                      Main.activateWindow(this._currentWindow);
                    }
                 }
             } else if (button==2) { // Middle Button
-               let action = this.settings.getValue("middle-click");
+                let action = this.settings.getValue("middle-click");
                 this._performMouseAction(action, this._currentWindow);
+            } else if (button==3) { // Right Button
+                this._contextMenu.toggle();
             } else if (button==8) { // Back Button
-               let action = this.settings.getValue("back-click");
+                let action = this.settings.getValue("back-click");
                 this._performMouseAction(action, this._currentWindow);
             } else if (button==9) { // Forward Button
-               let action = this.settings.getValue("forward-click");
+                let action = this.settings.getValue("forward-click");
                 this._performMouseAction(action, this._currentWindow);
             }
         }
@@ -1270,7 +1289,7 @@ class PanelAppLauncher extends DND.LauncherDraggable {
     }
 
    _updateOrientation() {
-      //log( `in _updateOrientation for app ${this.app.get_name()} with ${this._curWorkspaceWindowCnt} windows` )
+      //log( `in _updateOrientation for app ${this.app.get_name()} with ${this._windows.length} windows` )
       //var err = new Error();
       //log( "Stack:\n"+err.stack );
       this.actor.remove_style_class_name("top");
@@ -1662,12 +1681,9 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
     }
 
     _windowRemoved(screen, metaWindow, monitor) {
-        if (!Main.isInteresting(metaWindow)) {
-           return;
-        }
         let launcher = this.lookupLauncherForWindow(metaWindow);
-        this._signalManager.disconnect("workspace-changed", metaWindow);
         if (launcher) {
+           this._signalManager.disconnect("workspace-changed", metaWindow);
            launcher.windowRemoved(metaWindow);
         }
     }
@@ -1901,8 +1917,8 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
        if (menu && menu.isOpen) {
           this.removeThumbnailMenuDelay();
           menu.closeMenu();
-          this.currentMenu = undefined;
        }
+       this.currentMenu = undefined;
     }
 
     removeThumbnailMenuDelay(){
