@@ -343,8 +343,9 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
 
   _onButtonReleaseEvent (actor, event) {
     let mouseBtn = event.get_button();
-    if (this._launcherButton.holdPopup == mouseBtn) {
-       this._launcherButton.holdPopup = undefined;
+    log( `Relese Even: btn = ${mouseBtn} holdPopup btn = ${this._launcherButton._applet.holdPopup}` );
+    if (this._launcherButton._applet.holdPopup === mouseBtn) {
+       this._launcherButton._applet.holdPopup = undefined;
        this._launcherButton.closeThumbnailMenu()
        Main.activateWindow(this._metaWindow);
        return true;
@@ -506,7 +507,7 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
   }
 
   closeMenu() {
-    this._launcherButton.holdPopup = undefined;
+    this._launcherButton._applet.holdPopup = undefined;
     if (this._inHiding && this.numMenuItems > 1) {
       return;
     }
@@ -881,8 +882,10 @@ class PanelAppLauncher extends DND.LauncherDraggable {
     _onEnterEvent() {
        let curMenu = this._applet.currentMenu;
        if (curMenu && curMenu != this.menu && curMenu.isOpen) {
+          let holdPopup = this._applet.holdPopup;
           this.closeThumbnailMenu();
           this.openThumbnailMenu();
+          this._applet.holdPopup = holdPopup;
        } else if (this._windows.length > 0 && this.settings.getValue("menu-show-on-hover")) {
           this.openThumbnailMenuDelayed();
        }
@@ -1136,19 +1139,19 @@ class PanelAppLauncher extends DND.LauncherDraggable {
               let action = this.settings.getValue("middle-click");
               if (action == MouseAction.PreviewHold) {
                  this.openThumbnailMenu();
-                 this.holdPopup = 2;
+                 this._applet.holdPopup = 2;
               }
            } else if (mouseBtn == 8) {
               let action = this.settings.getValue("back-click");
               if (action == MouseAction.PreviewHold) {
                  this.openThumbnailMenu();
-                 this.holdPopup = 8;
+                 this._applet.holdPopup = 8;
               }
            } else if (mouseBtn == 9) {
               let action = this.settings.getValue("forward-click");
               if (action == MouseAction.PreviewHold) {
                  this.openThumbnailMenu();
-                 this.holdPopup = 9;
+                 this._applet.holdPopup = 9;
               }
            }
         }

@@ -68,7 +68,7 @@
          "Always": 1,
          "2 or more windows": 2
     },
-    "description": "Display number of application windows"
+    "description": "Display number of running application windows"
   },
   "middle-click": {
       "type": "combobox",
