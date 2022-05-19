@@ -208,8 +208,8 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
 
     this._iconSize = 20 * global.ui_scale;
     this.descSize = 24 * global.ui_scale;
-    this._icon = this._launcherButton._app ?
-                  this._launcherButton._app.create_icon_texture_for_window(this._iconSize, this._metaWindow) :
+    this._icon = this._launcherButton.app ?
+                  this._launcherButton.app.create_icon_texture_for_window(this._iconSize, this._metaWindow) :
                   new St.Icon({ icon_name: "application-default-icon",
                                 icon_type: St.IconType.FULLCOLOR,
                                 icon_size: this._iconSize });
@@ -343,7 +343,6 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
 
   _onButtonReleaseEvent (actor, event) {
     let mouseBtn = event.get_button();
-    log( `Relese Even: btn = ${mouseBtn} holdPopup btn = ${this._launcherButton._applet.holdPopup}` );
     if (this._launcherButton._applet.holdPopup === mouseBtn) {
        this._launcherButton._applet.holdPopup = undefined;
        this._launcherButton.closeThumbnailMenu()
@@ -1132,75 +1131,71 @@ class PanelAppLauncher extends DND.LauncherDraggable {
         if (this._contextMenu.isOpen) {
             this._contextMenu.toggle();
         }
-        pressLauncher = this.getAppname();
-        if (pressLauncher == this.getAppname()) {
-           let mouseBtn = event.get_button(); 
-           if (mouseBtn == 2) {
-              let action = this.settings.getValue("middle-click");
-              if (action == MouseAction.PreviewHold) {
-                 this.openThumbnailMenu();
-                 this._applet.holdPopup = 2;
-              }
-           } else if (mouseBtn == 8) {
-              let action = this.settings.getValue("back-click");
-              if (action == MouseAction.PreviewHold) {
-                 this.openThumbnailMenu();
-                 this._applet.holdPopup = 8;
-              }
-           } else if (mouseBtn == 9) {
-              let action = this.settings.getValue("forward-click");
-              if (action == MouseAction.PreviewHold) {
-                 this.openThumbnailMenu();
-                 this._applet.holdPopup = 9;
-              }
+        pressLauncher = this; //this.getAppname();
+        let mouseBtn = event.get_button(); 
+        if (mouseBtn == 2) {
+           let action = this.settings.getValue("middle-click");
+           if (action == MouseAction.PreviewHold) {
+              this.openThumbnailMenu();
+              this._applet.holdPopup = 2;
+           }
+        } else if (mouseBtn == 8) {
+           let action = this.settings.getValue("back-click");
+           if (action == MouseAction.PreviewHold) {
+              this.openThumbnailMenu();
+              this._applet.holdPopup = 8;
+           }
+        } else if (mouseBtn == 9) {
+           let action = this.settings.getValue("forward-click");
+           if (action == MouseAction.PreviewHold) {
+              this.openThumbnailMenu();
+              this._applet.holdPopup = 9;
            }
         }
     }
 
     _onButtonRelease(actor, event) {
-        if (pressLauncher == this.getAppname()) {
-            let button = event.get_button();
-            if (button==1) { // Left Button
-                if (this._currentWindow === null) {
-                   this.closeThumbnailMenu();
-                   this.launch();
-                } else {
-                   let thumbnailOnClick = this.settings.getValue("menu-show-on-click");
-                   if (this._windows.length > 1 && thumbnailOnClick ){
-                      if (thumbnailOnClick && this.menu.isOpen === false) {
-                         this.openThumbnailMenu();
-                      } else if (this.menu.isOpen === true) {
-                         this.closeThumbnailMenu();
-                      }
-                   } else if (hasFocus(this._currentWindow)) {
-                      for( let idx=0 ; idx < this._windows.length ; idx++ ) {
-                         if (this._windows[idx] === this._currentWindow) {
-                            this.closeThumbnailMenu();
-                            if (idx === this._windows.length-1) {
-                               Main.activateWindow(this._windows[0]);
-                            } else {
-                               Main.activateWindow(this._windows[idx+1]);
-                            }
-                            break;
-                         }
-                      }
-                   } else {
-                      this.closeThumbnailMenu();
-                      Main.activateWindow(this._currentWindow);
-                   }
-                }
-            } else if (button==2) { // Middle Button
-                let action = this.settings.getValue("middle-click");
-                this._performMouseAction(action, this._currentWindow);
-            } else if (button==3) { // Right Button
-                this._contextMenu.toggle();
-            } else if (button==8) { // Back Button
-                let action = this.settings.getValue("back-click");
-                this._performMouseAction(action, this._currentWindow);
-            } else if (button==9) { // Forward Button
-                let action = this.settings.getValue("forward-click");
-                this._performMouseAction(action, this._currentWindow);
+        let button = event.get_button();
+        if (button==1) { // Left Button
+            if (this._currentWindow === null) {
+               this.closeThumbnailMenu();
+               this.launch();
+            } else {
+               let thumbnailOnClick = this.settings.getValue("menu-show-on-click");
+               if (this._windows.length > 1 && thumbnailOnClick ){
+                  if (thumbnailOnClick && this.menu.isOpen === false) {
+                     this.openThumbnailMenu();
+                  } else if (this.menu.isOpen === true) {
+                     this.closeThumbnailMenu();
+                  }
+               } else if (hasFocus(this._currentWindow)) {
+                  for( let idx=0 ; idx < this._windows.length ; idx++ ) {
+                     if (this._windows[idx] === this._currentWindow) {
+                        this.closeThumbnailMenu();
+                        if (idx === this._windows.length-1) {
+                           Main.activateWindow(this._windows[0]);
+                        } else {
+                           Main.activateWindow(this._windows[idx+1]);
+                        }
+                        break;
+                     }
+                  }
+               } else {
+                  this.closeThumbnailMenu();
+                  Main.activateWindow(this._currentWindow);
+               }
             }
+        } else if (button==2) { // Middle Button
+            let action = this.settings.getValue("middle-click");
+            this._performMouseAction(action, this._currentWindow);
+        } else if (button==3) { // Right Button
+            this._contextMenu.toggle();
+        } else if (button==8) { // Back Button
+            let action = this.settings.getValue("back-click");
+            this._performMouseAction(action, this._currentWindow);
+        } else if (button==9) { // Forward Button
+            let action = this.settings.getValue("forward-click");
+            this._performMouseAction(action, this._currentWindow);
         }
     }
 
@@ -1327,9 +1322,9 @@ class PanelAppLauncher extends DND.LauncherDraggable {
         return this.getAppInfo().get_commandline();
     }
 
-    getAppname() {
-        return this.getAppInfo().get_name();
-    }
+    //getAppname() {
+    //    return this.getAppInfo().get_name();
+    //}
 
     getIcon() {
         let icon = this.getAppInfo().get_icon();
@@ -1615,7 +1610,6 @@ class CassiaPanelLaunchersApplet extends Applet.Applet {
 
     updateCassiaWindowList(){
         let applets = AppletManager.getRunningInstancesForUuid("CassiaWindowList@klangman");
-        log( `Found ${applets.length} cassia window list applets!` );
         for (let i=0 ; i < applets.length ; i++) {
            applets[i].cassiaPanelLaunchersUpdate();
         }
