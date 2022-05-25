@@ -234,7 +234,7 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
     this._label = new St.Label();
     let text = this._metaWindow.get_title();
     if (!text) {
-      text = this._launcherButton._app.get_name();
+      text = this._launcherButton.app.get_name();
     }
     if (!text) {
       text = "?";
@@ -390,10 +390,10 @@ class ThumbnailMenuItem extends PopupMenu.PopupBaseMenuItem {
     this._closeBin.hide();
 
     if (this._cloneBin) {
-      let animTime = this._settings.getValue("label-animation-time") * 0.001;
+      //let animTime = this._settings.getValue("label-animation-time") * 0.001;
       Tweener.addTween(this.actor, {
         width: 0,
-        time: animTime,
+        time: 0.5, //animTime,
         transition: "easeInOutQuad",
         onUpdate: Lang.bind(this, function() {
           this.actor.set_clip(this.actor.x, this.actor.y, this.actor.width, this.actor.height);
@@ -492,11 +492,10 @@ class ThumbnailMenu extends PopupMenu.PopupMenu {
     }
     this._updateOrientation();
     let windows = this._launcherButton._windows;
-    for (let i = 0; i < windows.length; i++) {
+    for (let i = windows.length-1; i >= 0; i--) {
       this.addWindow(windows[i]);
     }
     let wheelSetting = this._settings.getValue("wheel-adjusts-preview-size");
-    // TODO... fix this so it can be re-enabled!
     if (wheelSetting===ScrollWheelAction.OnGlobal)
        this.numThumbs = this._launcherButton._applet.thumbnailSize;
     this.updateUrgentState();
