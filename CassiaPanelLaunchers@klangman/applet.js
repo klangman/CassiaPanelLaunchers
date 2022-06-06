@@ -133,6 +133,13 @@ const MouseAction = {
   None: 99,           // No action performed
 }
 
+// Possible settings for the left mouse action for launcher buttons with 2+ windows
+const LeftClickGrouped = {
+   Toggle: 0,         // Restore most resent window or minimize if already in focus
+   Cycle: 1,          // Restore most recent window or cycle windows of any window is already in focus
+   Thumbnail: 2       // Show the Thumbnail menu of windows
+}
+
 const ScrollWheelAction = {
    Off: 0,
    On: 1,
@@ -1156,29 +1163,40 @@ class PanelAppLauncher extends DND.LauncherDraggable {
     _onButtonRelease(actor, event) {
         let button = event.get_button();
         if (button==1) { // Left Button
+            let leftActionGrouped = this.settings.getValue("grouped-left-click");
             if (this._currentWindow === null) {
                this.closeThumbnailMenu();
                this.launch();
-            } else {
-               let thumbnailOnClick = this.settings.getValue("menu-show-on-click");
-               if (this._windows.length > 1 && thumbnailOnClick ){
-                  if (thumbnailOnClick && this.menu.isOpen === false) {
+            } else if (this._windows.length > 1 && leftActionGrouped != LeftClickGrouped.Toggle) {
+               //let thumbnailOnClick = this.settings.getValue("menu-show-on-click");
+               log( `leftActionGrouped = ${leftActionGrouped}` );
+               if (leftActionGrouped === LeftClickGrouped.Thumbnail ){
+                  if (this.menu.isOpen === false) {
                      this.openThumbnailMenu();
-                  } else if (this.menu.isOpen === true) {
+                  } else {
                      this.closeThumbnailMenu();
                   }
-               } else if (hasFocus(this._currentWindow)) {
-                  for( let idx=0 ; idx < this._windows.length ; idx++ ) {
-                     if (this._windows[idx] === this._currentWindow) {
-                        this.closeThumbnailMenu();
-                        if (idx === this._windows.length-1) {
-                           Main.activateWindow(this._windows[0]);
-                        } else {
-                           Main.activateWindow(this._windows[idx+1]);
+               } else if (leftActionGrouped === LeftClickGrouped.Cycle) {
+                  if ( hasFocus(this._currentWindow)) {
+                     for( let idx=0 ; idx < this._windows.length ; idx++ ) {
+                        if (this._windows[idx] === this._currentWindow) {
+                           this.closeThumbnailMenu();
+                           if (idx === this._windows.length-1) {
+                              Main.activateWindow(this._windows[0]);
+                           } else {
+                              Main.activateWindow(this._windows[idx+1]);
+                           }
+                           break;
                         }
-                        break;
                      }
+                  } else {
+                     this.closeThumbnailMenu();
+                     Main.activateWindow(this._currentWindow);
                   }
+               }
+            } else {
+               if (hasFocus(this._currentWindow) && this._currentWindow.minimized===false) {
+                  this._currentWindow.minimize();
                } else {
                   this.closeThumbnailMenu();
                   Main.activateWindow(this._currentWindow);

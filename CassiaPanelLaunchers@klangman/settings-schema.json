@@ -1,22 +1,17 @@
 {
   "layout" : {
     "type" : "layout",
-    "pages" : ["general-page", "preview-page", "hotkey-page"],
+    "pages" : ["general-page", "preview-page"],
 
     "general-page" : {
       "type" : "page",
       "title" : "General",
-      "sections" : ["general-settings", "general-mouse"] 
+      "sections" : ["general-settings", "general-mouse"]
     },
     "preview-page" : {
       "type" : "page",
       "title" : "Thumbnails",
-      "sections" : ["preview-settings", "preview-mouse-section"] 
-    },
-    "hotkey-page" : {
-      "type" : "page",
-      "title" : "Hotkeys",
-      "sections" : ["hotkey-settings"]
+      "sections" : ["preview-settings", "preview-mouse-section"]
     },
 
     "general-settings" : {
@@ -27,7 +22,7 @@
     "general-mouse" : {
       "type" : "section",
       "title" : "Launcher mouse settings",
-    "keys" : ["middle-click", "back-click", "forward-click"]
+    "keys" : ["grouped-left-click", "middle-click", "back-click", "forward-click"]
     },
 
     "preview-settings" : {
@@ -38,13 +33,7 @@
     "preview-mouse-section" : {
       "type" : "section",
       "title" : "Thumbnails mouse settings",
-      "keys" : ["menu-show-on-hover", "preview-timeout-show", "preview-timeout-hide", "menu-show-on-click", "wheel-adjusts-preview-size", "preview-middle-click", "preview-back-click", "preview-forward-click"]
-    },
-
-    "hotkey-settings" : {
-      "type" : "section",
-      "title" : "Hotkey settings",
-      "keys" : ["hotkey-bindings", "hotkey-minimize", "hotkey-new", "hotkey-help"]
+      "keys" : ["menu-show-on-hover", "preview-timeout-show", "preview-timeout-hide", "wheel-adjusts-preview-size", "preview-middle-click", "preview-back-click", "preview-forward-click"]
     }
   },
 
@@ -69,6 +58,17 @@
          "2 or more windows": 2
     },
     "description": "Display number of running application windows"
+  },
+  "grouped-left-click": {
+    "type": "combobox",
+    "default": 2,
+    "options": {
+      "Restore/Minimize most recent window": 0,
+      "Restore then cycle windows": 1,
+      "Show thumbnail menu": 2
+    },
+    "description": "Left button action (2+ windows)",
+    "tooltip": "Action taken when using the left mouse button on a launcher button with more then one running window"
   },
   "middle-click": {
       "type": "combobox",
@@ -137,8 +137,8 @@
   "show-previews": {
     "type": "switch",
     "default": true,
-    "description": "Show thumbnails",
-    "tooltip": "If enabled, the popup menu will show window thumbnails\n(Always disabled when running Cinnamon in Software Rendering Mode)"
+    "description": "Show window thumbnails in the popup window list menu",
+    "tooltip": "If enabled, the popup menu will show window thumbnails,\notherwise the menu will only show window titles\n(Always disabled when running Cinnamon in Software Rendering Mode)"
   },
   "number-of-unshrunk-previews": {
     "type": "combobox",
@@ -230,12 +230,6 @@
     },
     "description": "Thumbnail window forward button action"
   },
-  "menu-show-on-click": {
-    "type": "switch",
-    "default": true,
-    "description": "Show thumbnail menu on left click of a launcher button with 2+ windows",
-    "tooltip": "If enabled, the thumbnail menu will appear when clicking on a launcher button with 2 or more windows"
-  },
   "wheel-adjusts-preview-size": {
     "type": "combobox",
     "default": 1,
@@ -248,47 +242,8 @@
     "description": "Adjust the thumbnail window sizes using the scroll-wheel",
     "tooltip": "If enabled, the size of thumbnail windows will respond to the mouse scroll-wheel. The new size can have a temporary effect or persist on a global or per button basis"
   },
-
-  "hotkey-bindings": {
-    "type" : "list",
-    "description" : "Hotkey binding available for assignment to a window",
-    "columns" : [
-        {"id": "enabled",     "title": "Enabled",      "type": "boolean", "default": true},
-        {"id": "cycle",       "title": "Cycle application windows", "type": "boolean", "default": false},
-        {"id": "keyCombo",    "title": "Key sequence", "type": "keybinding"},
-        {"id": "description", "title": "Description",  "type": "string"}
-    ],
-    "tooltip": "Define a list of hotkeys used to bring to the foreground specific windows.",
-    "default" : [
-            {
-                "enabled": true,
-                "cycle": true,
-                "keyCombo": "<Alt><Super>c::",
-                "description": "org.gnome.Calculator.desktop"
-            }
-    ]
-  },
-  "hotkey-minimize": {
-    "type": "switch",
-    "default": true,
-    "description": "Minimize window when hotkey target is already in focus",
-    "tooltip": "If enabled and application cycling is not enabled or there is only one window for the application, windows will be minimized if the window is already in focus"
-  },
-  "hotkey-new": {
-    "type": "switch",
-    "default": true,
-    "description": "Open a new window when the application is not running",
-    "tooltip": "Start a new window if no window is attached to a hotkey and the hotkey description is an exact match for the application name of a pinned button or a desktop file name"
-  },
-
-  "hotkey-help" : {
-    "type" : "label",
-    "description" : "Hotkeys can be assigned to a window in two ways:\n\n    1. Manual:\tOpen the context menu for a window list button and select \"Assign window to a hotkey\".\n    2. Automatic:\tEnter a \"Description\" string that matches an application name or a desktop file name.\n\t\t\t\tFor example: \"Google Chrome\" or \"firefox.desktop\"\n\nNote: Hotkeys already assigned by other applications will take precedence over any new entries added here. If a hotkey is not working, it's likely because that key combination is already assigned elsewhere.\nIf you remove or rearrange any hotkeys, manual window assignments may need to be reassigned"
-  },
-
   "launcherList": {
       "type": "generic",
       "default": ["firefox.desktop", "org.gnome.Terminal.desktop", "nemo.desktop"]
   }
-
 }
