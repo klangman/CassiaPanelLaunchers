@@ -2,7 +2,7 @@
  "uuid": "CassiaPanelLaunchers@klangman",
  "name": "Cassia Panel Launchers",
  "description": "Launch applications from the panel",
- "icon": "cinnamon-panel-launcher",
  "role": "panellauncher",
+ "author": "klangman",
  "max-instances": -1
 }
