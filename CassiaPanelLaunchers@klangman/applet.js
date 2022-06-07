@@ -45,6 +45,9 @@ const Util = imports.misc.util;
 const Settings = imports.ui.settings;
 const Signals = imports.signals;
 const SignalManager = imports.misc.signalManager;
+const Gettext = imports.gettext;
+
+const UUID = "CassiaPanelLaunchers@klangman";
 
 const PANEL_EDIT_MODE_KEY = 'panel-edit-mode';
 const PANEL_LAUNCHERS_KEY = 'panel-launchers';
@@ -148,6 +151,16 @@ const ScrollWheelAction = {
 }
 
 let pressLauncher = null;
+
+Gettext.bindtextdomain(UUID, GLib.get_home_dir() + "/.local/share/locale");
+
+function _(text) {
+  let locText = Gettext.dgettext(UUID, text);
+  if (locText == text) {
+    locText = window._(text);
+  }
+  return locText;
+}
 
 function hasFocus(metaWindow, allowTransient=true) {
     let window = global.display.get_focus_window();
