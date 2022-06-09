@@ -937,9 +937,6 @@ class PanelAppLauncher extends DND.LauncherDraggable {
         this.menu.recalcItemSizes();
         if (wheelSetting===ScrollWheelAction.OnGlobal) {
            this._applet.thumbnailSize = numThumbs;
-        } else if (wheelSetting===ScrollWheelAction.OnApplication) {
-           let launcher = this._applet.lookupLauncherForApp(this._app);
-           launcher.menu.numThumbs = numThumbs;
         }
     }
 
@@ -1182,7 +1179,6 @@ class PanelAppLauncher extends DND.LauncherDraggable {
                this.launch();
             } else if (this._windows.length > 1 && leftActionGrouped != LeftClickGrouped.Toggle) {
                //let thumbnailOnClick = this.settings.getValue("menu-show-on-click");
-               log( `leftActionGrouped = ${leftActionGrouped}` );
                if (leftActionGrouped === LeftClickGrouped.Thumbnail ){
                   if (this.menu.isOpen === false) {
                      this.openThumbnailMenu();
