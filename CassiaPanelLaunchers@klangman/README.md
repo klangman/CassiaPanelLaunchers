@@ -1,5 +1,9 @@
 This is a panel launcher applet for Cinnamon based on CinnamonPanelLaunchers with a number of additional features
 
+## This project has be suspended.
+The majority of the features have been intergrated into CassiaWindowList and that should be used instead of this applet.
+There are no plans to continue work on this applet.
+
 ## Requirements
 This applet has only been tested on Cinnamon 5.0, but I suspect it works on 4.0
 
